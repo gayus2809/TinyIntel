@@ -65,6 +65,23 @@ def summarize_text(text):
         return "⏳ The AI model is warming up. Please wait 20 seconds and click search again."
     else:
         return f"⚠️ Error {response.status_code}: Could not summarize."
+        def summarize_text(text):
+    payload = {
+        "inputs": text,
+        "parameters": {"max_length": 150, "min_length": 40, "do_sample": False}
+    }
+    
+    try:
+        response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=10)
+        if response.status_code == 200:
+            return response.json()[0]['summary_text']
+        else:
+            return f"Error: Inference API returned status code {response.status_code}"
+            
+    except requests.exceptions.ConnectionError:
+        return "The AI summarization service is currently unreachable. Please try again in a few moments."
+    except Exception as e:
+        return f"An unexpected error occurred during summarization: {str(e)}"
 
 # --- STREAMLIT UI ---
 st.set_page_config(page_title="Baby Product Science Summarizer", page_icon="👶")

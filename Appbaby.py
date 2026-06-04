@@ -84,9 +84,9 @@ def summarize_text(text):
         return f"An unexpected error occurred during summarization: {str(e)}"
 
 # --- STREAMLIT UI ---
-st.set_page_config(page_title="Baby Product Science Summarizer", page_icon="👶")
+st.set_page_config(page_title="Baby Product Scientific Lookup ", page_icon="👶")
 
-st.title("👶 Baby Product Research Summarizer")
+st.title("👶 Baby Product Research")
 st.write("Enter a baby product, ingredient, or brand (e.g., *talcum powder*, *melatonin*, *baby walker*). This app will search PubMed for open-access medical literature and summarize the findings.")
 
 st.markdown("---")

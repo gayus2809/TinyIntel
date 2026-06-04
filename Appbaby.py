@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import xml.etree.ElementTree as ET  # Added this line to fix the error
 # --- CONFIGURATION ---
 # Safely fetches the key from Streamlit's secure dashboard settings
 HF_API_KEY = st.secrets["HF_API_KEY"]
@@ -14,7 +15,6 @@ def search_pubmed(query, max_results=3):
         "retmode": "json",
         "retmax": max_results
     }
-    
     response = requests.get(search_url, params=search_params)
     if response.status_code == 200:
         return response.json().get("esearchresult", {}).get("idlist", [])

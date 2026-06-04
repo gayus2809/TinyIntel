@@ -47,7 +47,7 @@ def fetch_abstracts(id_list):
                 papers.append({"title": title, "abstract": abstract})
                 
     return papers
-
+    
 def summarize_text(text):
     """Sends text to Hugging Face's BART model for summarization."""
     headers = {"Authorization": f"Bearer {HF_API_KEY}"}
@@ -65,7 +65,7 @@ def summarize_text(text):
         return "⏳ The AI model is warming up. Please wait 20 seconds and click search again."
     else:
         return f"⚠️ Error {response.status_code}: Could not summarize."
-        def summarize_text(text):
+       def summarize_text(text):
     payload = {
         "inputs": text,
         "parameters": {"max_length": 150, "min_length": 40, "do_sample": False}
@@ -82,7 +82,6 @@ def summarize_text(text):
         return "The AI summarization service is currently unreachable. Please try again in a few moments."
     except Exception as e:
         return f"An unexpected error occurred during summarization: {str(e)}"
-
 # --- STREAMLIT UI ---
 st.set_page_config(page_title="Baby Product Scientific Lookup ", page_icon="👶")
 

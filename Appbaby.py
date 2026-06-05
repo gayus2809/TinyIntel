@@ -1,11 +1,19 @@
 import streamlit as st
 import requests
-import xml.etree.ElementTree as ET  # Added this line to fix the error
+import xml.etree.ElementTree as ET
+
 # --- CONFIGURATION ---
 # Safely fetches the key from Streamlit's secure dashboard settings
-HF_API_KEY = st.secrets["HF_API_KEY"]
+try:
+    HF_API_KEY = st.secrets["HF_API_KEY"]
+except Exception:
+    st.error("⚠️ Hugging Face API key not found. Please add it in Streamlit secrets.")
+    HF_API_KEY = None
+
 HF_API_URL = "https://api-inference.huggingface.co/models/facebook/bart-large-cnn"
+
 # --- HELPER FUNCTIONS ---
+@st.cache_data
 def search_pubmed(query, max_results=3):
     """Searches PubMed for free full-text articles matching the query."""
     search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
@@ -15,11 +23,15 @@ def search_pubmed(query, max_results=3):
         "retmode": "json",
         "retmax": max_results
     }
-    response = requests.get(search_url, params=search_params)
-    if response.status_code == 200:
+    try:
+        response = requests.get(search_url, params=search_params, timeout=10)
+        response.raise_for_status()
         return response.json().get("esearchresult", {}).get("idlist", [])
-    return []
+    except Exception as e:
+        st.error(f"⚠️ PubMed search failed: {e}")
+        return []
 
+@st.cache_data
 def fetch_abstracts(id_list):
     """Fetches the title and abstract for a list of PubMed IDs via XML."""
     if not id_list:
@@ -32,44 +44,57 @@ def fetch_abstracts(id_list):
         "retmode": "xml"
     }
     
-    response = requests.get(fetch_url, params=fetch_params)
-    papers = []
-    
-    if response.status_code == 200:
+    try:
+        response = requests.get(fetch_url, params=fetch_params, timeout=10)
+        response.raise_for_status()
+        papers = []
         root = ET.fromstring(response.content)
         for article in root.findall('.//PubmedArticle'):
             title = article.findtext('.//ArticleTitle')
-            # Sometimes abstracts are split into multiple sections (Background, Methods, etc.)
             abstract_texts = article.findall('.//AbstractText')
             abstract = " ".join([elem.text for elem in abstract_texts if elem.text])
-            
             if title and abstract:
                 papers.append({"title": title, "abstract": abstract})
-                
-    return papers
-    
+        return papers
+    except ET.ParseError:
+        st.error("⚠️ Could not parse PubMed response.")
+        return []
+    except Exception as e:
+        st.error(f"⚠️ Error fetching abstracts: {e}")
+        return []
+
 def summarize_text(text):
     """Sends text to Hugging Face's BART model for summarization."""
+    if not HF_API_KEY:
+        return "⚠️ Missing API key. Cannot summarize."
+    
     headers = {"Authorization": f"Bearer {HF_API_KEY}"}
     payload = {
-        "inputs": text, 
+        "inputs": text[:2000],  # limit text size to avoid crashes
         "parameters": {"max_length": 150, "min_length": 40, "do_sample": False}
     }
     
-    response = requests.post(HF_API_URL, headers=headers, json=payload)
-    
-    if response.status_code == 200:
-        return response.json()[0]['summary_text']
-    elif response.status_code == 503:
-        # Free HF models go to sleep when inactive. 503 means it's booting up.
-        return "⏳ The AI model is warming up. Please wait 20 seconds and click search again."
-    else:
-        return f"⚠️ Error {response.status_code}: Could not summarize."
+    try:
+        response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=20)
+        if response.status_code == 200:
+            data = response.json()
+            if isinstance(data, list) and "summary_text" in data[0]:
+                return data[0]["summary_text"]
+            else:
+                return "⚠️ Unexpected response format."
+        elif response.status_code == 503:
+            return "⏳ The AI model is warming up. Please wait 20 seconds and click search again."
+        else:
+            return f"⚠️ Error {response.status_code}: Could not summarize."
+    except Exception as e:
+        return f"⚠️ Summarization failed: {e}"
+
 # --- STREAMLIT UI ---
-st.set_page_config(page_title="Baby Product Scientific Lookup ", page_icon="👶")
+st.set_page_config(page_title="Baby Product Scientific Lookup", page_icon="👶")
 
 st.title("👶 Baby Product Research")
-st.write("Enter a baby product, ingredient, or brand (e.g., *talcum powder*, *melatonin*, *baby walker*). This app will search PubMed for open-access medical literature and summarize the findings.")
+st.write("Enter a baby product, ingredient, or brand (e.g., *talcum powder*, *melatonin*, *baby walker*). "
+         "This app will search PubMed for open-access medical literature and summarize the findings.")
 
 st.markdown("---")
 
@@ -91,12 +116,12 @@ if st.button("Search & Summarize", type="primary"):
                 if not papers:
                     st.warning("Found papers, but they didn't have usable abstracts.")
                 else:
+                    progress = st.progress(0)
                     for i, paper in enumerate(papers):
                         st.subheader(f"Paper {i+1}: {paper['title']}")
-                        
                         summary = summarize_text(paper['abstract'])
-                        
                         st.info(f"**AI Summary:** {summary}")
                         with st.expander("Read Original Abstract"):
                             st.write(paper['abstract'])
                         st.markdown("---")
+                        progress.progress((i+1)/len(papers))

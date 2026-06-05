@@ -1,8 +1,8 @@
 # --- CONFIGURATION ---
 # Safely fetches the key from Streamlit's secure dashboard settings
+import streamlit as st
 HF_API_KEY = st.secrets["HF_API_KEY"]
 HF_API_URL = "https://api-inference.huggingface.co/models/facebook/bart-large-cnn"
-import streamlit as st
 import requests
 import xml.etree.ElementTree as ET
 import time
